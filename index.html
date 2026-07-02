@@ -10,18 +10,14 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; }
         td { text-align: center; padding: 10px 0; cursor: pointer; }
-        .today { border: 2px solid #ff5722; color: #ff5722; font-weight: bold; border-radius: 50%; }
+        .today { border: 2px solid #ff5722; color: #ff5722; font-weight: bold; }
         .selected { background-color: rgba(0, 150, 255, 0.3); border-radius: 50%; }
-        
         #chart-container { position: relative; width: 200px; height: 200px; margin: 40px auto; border-radius: 50%; border: 2px solid #ddd; }
         #chart { width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden; }
-        
-        .segment { position: absolute; width: 100%; height: 100%; animation: sweep 2s ease-out forwards; }
+        .segment { position: absolute; width: 100%; height: 100%; animation: sweep 1s ease-out forwards; }
         @keyframes sweep { from { clip-path: polygon(50% 50%, 50% 0%, 50% 0%, 50% 0%); } to { clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 50% 0%); } }
-        
         .time-label { position: absolute; font-size: 10px; color: #555; }
         #eventList { margin-top: 15px; font-size: 0.9em; }
-        .delete-check { margin-right: 10px; }
     </style>
 </head>
 <body>
@@ -40,8 +36,6 @@
     <h3 id="selectedDateText">日付を選択してください</h3>
     <div id="chart-container"><div id="chart"></div></div>
     <div id="eventList"></div>
-    <button id="modeBtn" onclick="toggleDeleteMode()">削除モードにする</button>
-    <button id="deleteBtn" style="display:none;" onclick="confirmDelete()">選択した予定を削除</button>
     <hr>
     <input type="time" id="start"> ～ <input type="time" id="end"><br>
     <input type="text" id="title" placeholder="予定名">
@@ -50,20 +44,16 @@
 </div>
 
 <script>
-    // ★ここをスプレッドシートのURLに書き換えてください★
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxza4snn_WiIIUiEJPcqewtYUG3KODcJXHEt4UAqJSUzANh_BLuCDZtXPlm2FOpSH-K/exec';
 
     let currentDate = new Date();
-    let events = {}; // クラウドから取得したデータを格納
-    let selectedDate = "";
-    let isDeleteMode = false;
+    let events = {}; 
+    let selectedDate = ""; // 形式: "2026-7-3"
 
-    // データ読み込み
     async function fetchData() {
-        const response = await fetch(SCRIPT_URL);
+        const response = await fetch(SCRIPT_URL, { cache: "no-store" });
         const data = await response.json();
         events = {};
-        // 2行目から読み込み (1行目はヘッダー)
         data.slice(1).forEach(row => {
             const [date, start, end, title, color] = row;
             if(!events[date]) events[date] = [];
@@ -78,7 +68,6 @@
         const month = currentDate.getMonth();
         const now = new Date();
         document.getElementById('monthYear').innerText = `${year}年 ${month + 1}月`;
-        document.getElementById('todayDisplay').innerText = `本日は ${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日です`;
         
         let html = '<tr><th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th></tr><tr>';
         const firstDay = new Date(year, month, 1).getDay();
@@ -87,9 +76,10 @@
         for(let i=0; i<firstDay; i++) html += '<td></td>';
         for(let d=1; d<=lastDate; d++) {
             if((firstDay + d - 1) % 7 === 0) html += '</tr><tr>';
+            const dateStr = `${year}-${month + 1}-${d}`;
             const isToday = (year === now.getFullYear() && month === now.getMonth() && d === now.getDate());
-            const isSelected = (selectedDate === `${year}-${month}-${d}`);
-            html += `<td class="${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" onclick="selectDate(${year}, ${month}, ${d})">${d}</td>`;
+            const isSelected = (selectedDate === dateStr);
+            html += `<td class="${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" onclick="selectDate(${year}, ${month + 1}, ${d})">${d}</td>`;
         }
         document.getElementById('calendarTable').innerHTML = html + '</tr>';
     }
@@ -100,19 +90,14 @@
         const end = document.getElementById('end').value;
         const title = document.getElementById('title').value;
         const color = document.getElementById('color').value;
-        if(!start || !end || !title) return alert("全て入力してください");
         
-        const sMin = start.split(':').reduce((a,b) => a*60 + parseInt(b), 0);
-        const eMin = end.split(':').reduce((a,b) => a*60 + parseInt(b), 0);
-        if(eMin <= sMin) return alert("終了時間は開始時間より後に設定してください！");
-        
-        // データ送信
         await fetch(SCRIPT_URL, {
             method: 'POST',
+            mode: 'no-cors', // CORSエラー回避
             body: JSON.stringify({type: 'add', date: selectedDate, start, end, title, color})
         });
         
-        await fetchData(); // 再取得して更新
+        setTimeout(fetchData, 1000); // 少し待ってからデータ再取得
     }
 
     function updateChart() {
@@ -121,58 +106,32 @@
         chart.innerHTML = "";
         list.innerHTML = "";
         
-        const dayEvents = (events[selectedDate] || []).sort((a,b) => a.start.localeCompare(b.start));
-        dayEvents.forEach((e, index) => {
+        const dayEvents = (events[selectedDate] || []);
+        dayEvents.forEach(e => {
             const s = e.start.split(':').reduce((a,b) => a*60 + parseInt(b), 0);
             const len = (e.end.split(':').reduce((a,b) => a*60 + parseInt(b), 0) - s) / 1440 * 360;
             const deg = (s / 1440 * 360);
-            
             const div = document.createElement('div');
             div.className = 'segment';
             div.style.background = `conic-gradient(${e.color} ${len}deg, transparent 0deg)`;
             div.style.transform = `rotate(${deg}deg)`;
             chart.appendChild(div);
-            
-            const check = isDeleteMode ? `<input type="checkbox" class="delete-check" value="${index}"> ` : "";
-            list.innerHTML += `<div>${check}${e.start}~${e.end} : ${e.title}</div>`;
+            list.innerHTML += `<div>${e.start}~${e.end} : ${e.title}</div>`;
         });
     }
 
-    function toggleDeleteMode() {
-        isDeleteMode = !isDeleteMode;
-        document.getElementById('modeBtn').innerText = isDeleteMode ? "通常モードに戻す" : "削除モードにする";
-        document.getElementById('deleteBtn').style.display = isDeleteMode ? "inline" : "none";
-        updateChart();
-    }
-
-    // 注意：削除処理はスプレッドシート側のコード修正も必要になります（今回は読み込み優先で設計）
-    function confirmDelete() { alert("削除機能はデータベース連携中のため、シートから直接削除してください。"); }
-
     function selectDate(y, m, d) {
         selectedDate = `${y}-${m}-${d}`;
-        document.getElementById('selectedDateText').innerText = `${m+1}月${d}日の予定一覧`;
+        document.getElementById('selectedDateText').innerText = `${m}月${d}日の予定`;
         renderCalendar();
         updateChart();
     }
     
-    function drawTimeLabels() {
-        const container = document.getElementById('chart-container');
-        for(let i=0; i<12; i++) {
-            const label = document.createElement('div');
-            label.className = 'time-label';
-            label.innerText = i * 2;
-            const angle = (i * 30 - 90) * (Math.PI / 180);
-            label.style.left = (100 + 120 * Math.cos(angle) - 5) + 'px';
-            label.style.top = (100 + 120 * Math.sin(angle) - 5) + 'px';
-            container.appendChild(label);
-        }
-    }
-
     function changeMonth(delta) { currentDate.setMonth(currentDate.getMonth() + delta); renderCalendar(); }
     function jumpToToday() { currentDate = new Date(); renderCalendar(); }
 
-    fetchData(); // 初回データ取得
-    drawTimeLabels();
+    fetchData();
 </script>
 </body>
 </html>
+
