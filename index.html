@@ -5,91 +5,58 @@
     <title>タスク管理カレンダー</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f9; display: flex; flex-direction: column; align-items: center; }
-        .calendar, .editor { background: white; width: 100%; max-width: 400px; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calendar { background: white; width: 100%; max-width: 400px; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; }
         td { text-align: center; padding: 10px 0; cursor: pointer; border: 1px solid #eee; }
         .selected { background-color: #e3f2fd; font-weight: bold; }
-        #chart-container { position: relative; width: 200px; height: 200px; margin: 20px auto; border-radius: 50%; border: 2px solid #ddd; }
-        #eventList { margin-top: 15px; font-size: 0.9em; }
     </style>
 </head>
 <body>
 
-<!-- カレンダーエリアをここに強制配置 -->
-<div class="calendar" id="calendarApp">
-    <div class="header">
+<div class="calendar">
+    <div class="header" style="display:flex; justify-content:space-between;">
         <button onclick="changeMonth(-1)">＜</button>
-        <div id="monthDisplay">読み込み中...</div>
+        <div id="monthDisplay"></div>
         <button onclick="changeMonth(1)">＞</button>
     </div>
     <table id="calendarTable"></table>
 </div>
 
-<div class="editor">
-    <h3 id="selectedDateText">日付を選択してください</h3>
-    <div id="chart-container"><div id="chart"></div></div>
-    <div id="eventList"></div>
-    <hr>
-    <input type="time" id="start"> ～ <input type="time" id="end"><br>
-    <input type="text" id="title" placeholder="予定名">
-    <input type="color" id="color" value="#ff5722">
-    <button onclick="addEvent()">追加</button>
-</div>
-
 <script>
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxza4snn_WiIIUiEJPcqewtYUG3KODcJXHEt4UAqJSUzANh_BLuCDZtXPlm2FOpSH-K/exec';
-    
+    // 1. グローバル変数の定義
     const now = new Date();
     let displayYear = now.getFullYear();
     let displayMonth = now.getMonth() + 1;
-    let selectedDateStr = "";
 
-    // ページ読み込み時に即座にカレンダーを描画
-    window.onload = function() {
-        renderCalendar();
-        fetchData();
-    };
-
+    // 2. カレンダー描画関数（最優先で実行）
     function renderCalendar() {
         const table = document.getElementById('calendarTable');
-        if (!table) return; // エラー回避
-
-        document.getElementById('monthDisplay').innerText = `${displayYear}年 ${displayMonth}月`;
+        const display = document.getElementById('monthDisplay');
+        
+        display.innerText = displayYear + "年" + displayMonth + "月";
+        
         const firstDay = new Date(displayYear, displayMonth - 1, 1).getDay();
         const lastDate = new Date(displayYear, displayMonth, 0).getDate();
         
         let html = '<tr><th>日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th></tr><tr>';
-        for(let i=0; i<firstDay; i++) html += '<td></td>';
-        for(let d=1; d<=lastDate; d++) {
+        for(let i = 0; i < firstDay; i++) html += '<td></td>';
+        for(let d = 1; d <= lastDate; d++) {
             if((firstDay + d - 1) % 7 === 0) html += '</tr><tr>';
-            const dateStr = `${displayYear}-${displayMonth}-${d}`;
-            const isSelected = (selectedDateStr === dateStr);
-            html += `<td class="${isSelected ? 'selected' : ''}" onclick="selectDate(${displayYear}, ${displayMonth}, ${d})">${d}</td>`;
+            html += '<td>' + d + '</td>';
         }
         table.innerHTML = html + '</tr>';
     }
 
-    async function fetchData() {
-        try {
-            const res = await fetch(SCRIPT_URL + '?cache=' + new Date().getTime());
-            const data = await res.json();
-            window.events = {};
-            data.slice(1).forEach(row => {
-                const [date, start, end, title, color] = row;
-                if(!window.events[date]) window.events[date] = [];
-                window.events[date].push({start, end, title, color});
-            });
-            renderCalendar();
-        } catch(e) { console.log("通信待機中"); }
-    }
-    
-    function selectDate(y, m, d) {
-        selectedDateStr = `${y}-${m}-${d}`;
-        document.getElementById('selectedDateText').innerText = `${m}月${d}日の予定`;
+    // 3. ページ読み込み時に即実行
+    window.onload = renderCalendar;
+
+    // 4. 月変更関数
+    function changeMonth(delta) {
+        displayMonth += delta;
+        if(displayMonth > 12) { displayMonth = 1; displayYear++; }
+        if(displayMonth < 1) { displayMonth = 12; displayYear--; }
         renderCalendar();
     }
-    // ...以下 addEvent 等はそのまま
 </script>
 </body>
 </html>
