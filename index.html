@@ -41,16 +41,16 @@
 <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxza4snn_WiIIUiEJPcqewtYUG3KODcJXHEt4UAqJSUzANh_BLuCDZtXPlm2FOpSH-K/exec';
     
-    // 表示用：常に1月＝1、12月＝12として扱う
+    // 現在の表示年月を管理
     let displayYear = 2026;
     let displayMonth = 7; 
-    let selectedDateStr = "";
+    let selectedDateStr = ""; // 最終的に "2026-7-3" という形式になる
 
+    // スプレッドシートから読み込み
     async function fetchData() {
         const res = await fetch(SCRIPT_URL + '?cache=' + new Date().getTime());
         const data = await res.json();
         window.events = {};
-        // データの1行目はヘッダーとみなし2行目から処理
         data.slice(1).forEach(row => {
             const [date, start, end, title, color] = row;
             if(!window.events[date]) window.events[date] = [];
@@ -62,8 +62,6 @@
 
     function renderCalendar() {
         document.getElementById('monthDisplay').innerText = `${displayYear}年 ${displayMonth}月`;
-        
-        // 1ヶ月前ではなく「その月の1日」の曜日を取得
         const firstDay = new Date(displayYear, displayMonth - 1, 1).getDay();
         const lastDate = new Date(displayYear, displayMonth, 0).getDate();
         
@@ -71,6 +69,7 @@
         for(let i=0; i<firstDay; i++) html += '<td></td>';
         for(let d=1; d<=lastDate; d++) {
             if((firstDay + d - 1) % 7 === 0) html += '</tr><tr>';
+            // 【重要】ここで表示用変数から日付を作成（new Date()には頼らない）
             const dateStr = `${displayYear}-${displayMonth}-${d}`;
             const isSelected = (selectedDateStr === dateStr);
             html += `<td class="${isSelected ? 'selected' : ''}" onclick="selectDate(${displayYear}, ${displayMonth}, ${d})">${d}</td>`;
@@ -79,6 +78,7 @@
     }
 
     function selectDate(y, m, d) {
+        // 選んだボタンの数字をそのまま使う
         selectedDateStr = `${y}-${m}-${d}`;
         document.getElementById('selectedDateText').innerText = `${m}月${d}日の予定`;
         updateChart();
@@ -87,6 +87,7 @@
 
     async function addEvent() {
         if(!selectedDateStr) return alert("日付を選択してね");
+        // 送信直前に selectedDateStr をそのまま使うのでズレない
         const body = JSON.stringify({
             type: 'add',
             date: selectedDateStr,
@@ -101,9 +102,7 @@
     }
 
     function updateChart() {
-        const chart = document.getElementById('chart');
         const list = document.getElementById('eventList');
-        chart.innerHTML = "";
         list.innerHTML = "";
         (window.events[selectedDateStr] || []).forEach(e => {
             list.innerHTML += `<div>${e.start}~${e.end} : ${e.title}</div>`;
