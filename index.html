@@ -9,11 +9,10 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; }
         td { text-align: center; padding: 10px 0; cursor: pointer; border: 1px solid #eee; }
-        .today { color: #ff5722; font-weight: bold; border: 2px solid #ff5722; }
-        .selected { background-color: #e3f2fd; }
+        .selected { background-color: #e3f2fd; font-weight: bold; }
         #chart-container { position: relative; width: 200px; height: 200px; margin: 20px auto; border-radius: 50%; border: 2px solid #ddd; }
         #chart { width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden; }
-        .segment { position: absolute; width: 100%; height: 100%; background: #ff5722; }
+        .segment { position: absolute; width: 100%; height: 100%; }
         #eventList { margin-top: 15px; font-size: 0.9em; }
     </style>
 </head>
@@ -42,25 +41,29 @@
 <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxza4snn_WiIIUiEJPcqewtYUG3KODcJXHEt4UAqJSUzANh_BLuCDZtXPlm2FOpSH-K/exec';
     
-    // 表示用の基準年月を保持
-    let displayYear = new Date().getFullYear();
-    let displayMonth = new Date().getMonth() + 1;
-    let selectedDateStr = ""; // 例: "2026-7-3"
+    // 表示用：常に1月＝1、12月＝12として扱う
+    let displayYear = 2026;
+    let displayMonth = 7; 
+    let selectedDateStr = "";
 
     async function fetchData() {
-        const res = await fetch(SCRIPT_URL, { cache: "no-store" });
+        const res = await fetch(SCRIPT_URL + '?cache=' + new Date().getTime());
         const data = await res.json();
         window.events = {};
+        // データの1行目はヘッダーとみなし2行目から処理
         data.slice(1).forEach(row => {
             const [date, start, end, title, color] = row;
             if(!window.events[date]) window.events[date] = [];
             window.events[date].push({start, end, title, color});
         });
         renderCalendar();
+        if(selectedDateStr) updateChart();
     }
 
     function renderCalendar() {
         document.getElementById('monthDisplay').innerText = `${displayYear}年 ${displayMonth}月`;
+        
+        // 1ヶ月前ではなく「その月の1日」の曜日を取得
         const firstDay = new Date(displayYear, displayMonth - 1, 1).getDay();
         const lastDate = new Date(displayYear, displayMonth, 0).getDate();
         
@@ -98,7 +101,9 @@
     }
 
     function updateChart() {
+        const chart = document.getElementById('chart');
         const list = document.getElementById('eventList');
+        chart.innerHTML = "";
         list.innerHTML = "";
         (window.events[selectedDateStr] || []).forEach(e => {
             list.innerHTML += `<div>${e.start}~${e.end} : ${e.title}</div>`;
