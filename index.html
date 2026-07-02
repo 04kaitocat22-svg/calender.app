@@ -1,40 +1,29 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>タスク管理カレンダー</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; display: flex; flex-direction: column; align-items: center; }
-        .calendar { background: white; width: 100%; max-width: 400px; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        td { text-align: center; padding: 10px 0; cursor: pointer; border: 1px solid #eee; }
-        .selected { background-color: #e3f2fd; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-<div class="calendar">
-    <div class="header" style="display:flex; justify-content:space-between;">
-        <button onclick="changeMonth(-1)">＜</button>
-        <div id="monthDisplay"></div>
-        <button onclick="changeMonth(1)">＞</button>
-    </div>
-    <table id="calendarTable"></table>
-</div>
-
 <script>
-    // 1. グローバル変数の定義
-    const now = new Date();
-    let displayYear = now.getFullYear();
-    let displayMonth = now.getMonth() + 1;
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxza4snn_WiIIUiEJPcqewtYUG3KODcJXHEt4UAqJSUzANh_BLuCDZtXPlm2FOpSH-K/exec';
+    
+    let displayYear = new Date().getFullYear();
+    let displayMonth = new Date().getMonth() + 1;
+    let events = {}; // 予定データを格納するオブジェクト
 
-    // 2. カレンダー描画関数（最優先で実行）
+    // データの読み込み
+    async function fetchData() {
+        const res = await fetch(SCRIPT_URL);
+        const data = await res.json();
+        events = {}; // リセット
+        // 1行目は見出しと仮定し、2行目から処理
+        for (let i = 1; i < data.length; i++) {
+            const [date, start, end, title, color] = data[i];
+            if (!events[date]) events[date] = [];
+            events[date].push({title});
+        }
+        renderCalendar();
+    }
+
     function renderCalendar() {
         const table = document.getElementById('calendarTable');
-        const display = document.getElementById('monthDisplay');
+        document.getElementById('monthDisplay').innerText = `${displayYear}年${displayMonth}月`;
         
-        display.innerText = displayYear + "年" + displayMonth + "月";
-        
+        // 【修正点】ここで月を-1する（JavaScriptの月は0-11のため）
         const firstDay = new Date(displayYear, displayMonth - 1, 1).getDay();
         const lastDate = new Date(displayYear, displayMonth, 0).getDate();
         
@@ -42,22 +31,23 @@
         for(let i = 0; i < firstDay; i++) html += '<td></td>';
         for(let d = 1; d <= lastDate; d++) {
             if((firstDay + d - 1) % 7 === 0) html += '</tr><tr>';
-            html += '<td>' + d + '</td>';
+            
+            // 日付を固定形式（例: 2026-7-3）にする
+            const dateKey = `${displayYear}-${displayMonth}-${d}`;
+            const hasEvent = events[dateKey] ? 'style="background:#ffe0b2"' : '';
+            html += `<td ${hasEvent}>${d}</td>`;
         }
         table.innerHTML = html + '</tr>';
     }
 
-    // 3. ページ読み込み時に即実行
-    window.onload = renderCalendar;
-
-    // 4. 月変更関数
     function changeMonth(delta) {
         displayMonth += delta;
         if(displayMonth > 12) { displayMonth = 1; displayYear++; }
         if(displayMonth < 1) { displayMonth = 12; displayYear--; }
         renderCalendar();
     }
+
+    // 起動時に取得
+    fetchData();
 </script>
-</body>
-</html>
 
