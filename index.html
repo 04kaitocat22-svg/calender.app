@@ -1,29 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>タスク管理カレンダー</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; display: flex; flex-direction: column; align-items: center; }
+        .calendar { background: white; width: 100%; max-width: 400px; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        td { text-align: center; padding: 10px 0; cursor: pointer; border: 1px solid #eee; }
+        .selected { background-color: #e3f2fd; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="calendar">
+    <div class="header" style="display:flex; justify-content:space-between;">
+        <button onclick="changeMonth(-1)">＜</button>
+        <div id="monthDisplay">読み込み中...</div>
+        <button onclick="changeMonth(1)">＞</button>
+    </div>
+    <table id="calendarTable"></table>
+</div>
+
 <script>
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBkl9Ly3_tRb7Mnqo6cEfEsCacuiPz4Wl1OaV_S5PyvwM3bJGiI_Ce1f_lz7d3elp4/exec';
     
     let displayYear = new Date().getFullYear();
     let displayMonth = new Date().getMonth() + 1;
-    let events = {}; // 予定データを格納するオブジェクト
+    let events = {};
 
-    // データの読み込み
     async function fetchData() {
-        const res = await fetch(SCRIPT_URL);
-        const data = await res.json();
-        events = {}; // リセット
-        // 1行目は見出しと仮定し、2行目から処理
-        for (let i = 1; i < data.length; i++) {
-            const [date, start, end, title, color] = data[i];
-            if (!events[date]) events[date] = [];
-            events[date].push({title});
+        try {
+            // ?t=... でキャッシュを回避
+            const res = await fetch(SCRIPT_URL + '?t=' + new Date().getTime());
+            const data = await res.json();
+            
+            events = {};
+            // 1行目は見出し（Date, Start...）なので i=1 から開始
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                if (row[0]) {
+                    if (!events[row[0]]) events[row[0]] = [];
+                    events[row[0]].push({title: row[3]});
+                }
+            }
+            renderCalendar();
+        } catch(e) {
+            console.log("読み込み失敗、カレンダーのみ表示します");
+            renderCalendar();
         }
-        renderCalendar();
     }
 
     function renderCalendar() {
         const table = document.getElementById('calendarTable');
         document.getElementById('monthDisplay').innerText = `${displayYear}年${displayMonth}月`;
         
-        // 【修正点】ここで月を-1する（JavaScriptの月は0-11のため）
         const firstDay = new Date(displayYear, displayMonth - 1, 1).getDay();
         const lastDate = new Date(displayYear, displayMonth, 0).getDate();
         
@@ -31,11 +62,9 @@
         for(let i = 0; i < firstDay; i++) html += '<td></td>';
         for(let d = 1; d <= lastDate; d++) {
             if((firstDay + d - 1) % 7 === 0) html += '</tr><tr>';
-            
-            // 日付を固定形式（例: 2026-7-3）にする
             const dateKey = `${displayYear}-${displayMonth}-${d}`;
-            const hasEvent = events[dateKey] ? 'style="background:#ffe0b2"' : '';
-            html += `<td ${hasEvent}>${d}</td>`;
+            const color = events[dateKey] ? 'style="background:#ffe0b2"' : '';
+            html += `<td ${color}>${d}</td>`;
         }
         table.innerHTML = html + '</tr>';
     }
@@ -47,7 +76,8 @@
         renderCalendar();
     }
 
-    // 起動時に取得
     fetchData();
 </script>
+</body>
+</html>
 
